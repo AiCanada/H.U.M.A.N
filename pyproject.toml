@@ -1,0 +1,207 @@
+# Artificial Intelligence Canada Inc.
+# Project H.U.M.A.N. V0.888
+# High Utility Molecular Affinity Nexus
+
+[project]
+name = "rbase"
+version = "0.1.0"
+description = "RBase: SE(3)-diffusion + autoregressive protein conformation generation, with DPF family-level fine-tune"
+readme = "README.md"
+requires-python = ">=3.10"
+
+# ---------------------------------------------------------------------------
+# Known-good combinations (both are exercised by the code; the version-adaptive
+# compatibility layer in src/rbase/model/temporal/llama.py bridges them):
+#
+#   [A] "tested-legacy" - the environment ConfRover-base-20M-v1.0 was trained and
+#       released under:
+#         python 3.10, torch 2.1.2, numpy 1.24.4, scipy 1.11.3, einops 0.7.0,
+#         transformers 4.41.2, lightning 2.0.1, mdtraj 1.9.9, biopython 1.81,
+#         deepspeed 0.11.1 (optional extra), triton 2.1.0 (Linux only)
+#       This is the only combination where KV-cached autoregressive *generation*
+#       works, because transformers>=5 removed `SinkCache` and the legacy
+#       `DynamicCache.key_cache` layout that `model/temporal/kv_cache.py` needs.
+#
+#   [B] "current" - the environment this repo is developed against today:
+#         python 3.13, torch 2.13, numpy 2.4.4, scipy 1.18, einops 0.8.2,
+#         transformers 5.14.1, lightning 2.6.5, mdtraj 1.11, biopython 1.87,
+#         no deepspeed, no triton wheels on Windows
+#       Training and plain (use_cache=False) forward passes are supported here.
+#
+# The pins below are ranges, not `==`, so that BOTH resolve. Exact pins were
+# previously declared for packages that have no wheels for python>=3.12
+# (numpy 1.24.4, numba, pyemma, jax, ...), which made `pip install .` impossible.
+# ---------------------------------------------------------------------------
+dependencies = [
+  # --- core numerics / DL ---
+  "torch>=2.1.2,<3",
+  "numpy>=1.24.4,<3",
+  "scipy>=1.11.3,<2",
+  "einops>=0.7.0,<1",
+  "transformers>=4.41.2,<6",
+  "lightning>=2.0.1,<3",
+  "accelerate>=0.30",
+  "safetensors>=0.4",
+  # Official triton wheels are Linux-only. Windows needs the community build
+  # so train-step TFLOP accounting can import Triton's JITFunction.
+  "triton>=2.1.0; platform_system == 'Linux'",
+  "triton-windows>=3.0.0; platform_system == 'Windows'",
+  # Module-scope imports that were missing from this list, so a fresh
+  # `pip install .` produced an environment that crashed on first use:
+  #   pandas       -> data/infer.py (the `rbase generate` path), msa_loader,
+  #                   pretrain_repr/openfold/{loader,make_openfold_repr}
+  #   torchmetrics -> utils/torch/callbacks.py (MetricsHandler, used by training)
+  #   rich         -> utils/hydra_utils/rich_utils.py
+  #   requests     -> data/msa/mmseq2_colab.py and utils/misc/__init__.py; the
+  #                   CLI imports both at startup, so `rbase train` crashed on
+  #                   a fresh vast.ai venv that had it only by accident elsewhere
+  "pandas>=2.0",
+  "torchmetrics>=1.0",
+  "rich>=13.0",
+  "requests>=2.28",
+  # --- config / plumbing (imported by rbase) ---
+  "omegaconf>=2.3.0,<3",
+  "hydra-core>=1.3.2,<2",
+  "hydra-colorlog>=1.2.0,<2",
+  "ml-collections>=0.1.1",
+  "dm-tree>=0.1.8",
+  "huggingface-hub>=0.23",
+  "tqdm>=4.64",
+  # --- structural biology I/O (imported by rbase / _ext.openfold) ---
+  "mdtraj>=1.9.9,<2",
+  "biopython>=1.81,<2",
+  "modelcif>=0.9",
+  # --- test runner (pytest addopts in this file require xdist) ---
+  "pytest>=7.4",
+  "pytest-xdist",
+]
+
+[project.optional-dependencies]
+
+# DeepSpeed is imported lazily and never at import time of the package:
+#   - rbase/utils/torch/ckpt.py imports .zero_to_fp32 inside the functions
+#     that handle a deepspeed ZeRO checkpoint;
+#   - _ext/{openfold,ligo_af3} guard `import deepspeed` in try/except for the
+#     DS4Sci_EvoformerAttention kernel (`use_deepspeed_evo_attention`).
+# It has no wheels for recent python versions, so it must not be a hard dep.
+deepspeed = [
+    "deepspeed>=0.11.1",
+]
+
+# Amber relaxation (_ext/openfold/np/relax/{amber_minimize,cleanup,utils}.py).
+# Nothing under `rbase` imports that path -- it is dead weight for training
+# and generation -- and two of the three are git URLs, so declaring them as hard
+# requirements made a plain `pip install .` need git and network for a feature
+# the package never calls. Same class of bug as pandas/torchmetrics/rich being
+# missing, in the opposite direction.
+relax = [
+    "openmm[cuda]>=8.1,<9",
+    "pdbfixer @ git+https://github.com/openmm/pdbfixer.git@v1.10",
+    "openmmtools @ git+https://github.com/choderalab/openmmtools.git@0.24.0",
+]
+
+# `visual output/` -- the ensemble viewer and movie renderer. The HTML page
+# needs nothing beyond numpy, which is already a hard dependency; only the MP4
+# path needs an encoder, and it imports it inside the function that shells out
+# to it, so a machine that only ever makes pages never has to install this.
+viz = [
+    "imageio-ffmpeg>=0.4.9",
+]
+
+# Notebook / trajectory-analysis stack. None of these are imported by the
+# `rbase` package itself; they exist for the analysis notebooks. Several
+# (jax 0.4.x, numba, pyemma, jupyter-contrib-nbextensions) have no wheels for
+# python>=3.12, which is why they are no longer required for a plain install.
+analysis = [
+    "biotite>=0.40.0",
+    "deeptime>=0.4.4",
+    "diffusers[torch]>=0.34.0",
+    "easydict>=1.10",
+    "jax>=0.4.27",
+    "jupyter>=1.0.0",
+    "jupyter-contrib-nbextensions>=0.7.0",
+    "matplotlib>=3.8.0",
+    "mdanalysis>=2.6.1",
+    "numba>=0.60.0",
+    "numexpr>=2.8",
+    "pyarrow>=18.1.0",
+    "pyemma>=2.5.12",
+    "rdkit>=2023.3.3",
+    "scikit-learn>=1.3.1",
+    "seaborn>=0.13.0",
+    "tables>=3.8",
+]
+
+dev = [
+    "coverage",
+    "requests",
+    "ruff",
+    "basedpyright",
+    "jupyter",
+    "ipython"
+]
+
+#### Package build ####
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# packages = ["rbase"]
+# package-dir = { "rbase" = "src/rbase" }
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["rbase*"]
+
+[tool.setuptools.package-data]
+rbase = [
+  "configs/*.yaml",
+  "configs/*/*.yaml",
+  "_patch/openfold/stereo_chemical_props.txt",
+  "_ext/openfold/resources/*",
+  "_ext/openfold/LICENSE.txt",
+]
+
+#### Setup scripts ####
+[project.scripts]
+rbase = "rbase.cli:main"
+
+#### Test ####
+[tool.pytest.ini_options]
+
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:.*no __module__.*:",
+    "ignore:.*nested tensors.*:",
+    "ignore:.*log_every_n_steps.*:",
+]
+
+# Show summary of skipped/xfail tests
+addopts = "-ra -n 4"
+
+testpaths = [
+  "tests"
+]
+
+#### Format ####
+[tool.ruff]
+target-version = "py310"
+select = ["I"]
+exclude = ["**/_deprecated", "**/_ext/openfold/**"]
+lint.extend-select = ["FA102", "FA100"]
+lint.ignore = ["D100", "D104", "COM812", "ISC001", "F722", "F821", "E731", "E741", "E402", "E722"]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+deprecateTypingAliases = true
+strictListInference = true
+strictDictionaryInference = true
+strictSetInference = true
+reportPrivateImportUsage = false

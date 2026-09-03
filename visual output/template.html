@@ -1,0 +1,1020 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+<style>
+/* ---------- tokens: the complete light set on bare :root ----------
+   Every colour is defined here first, so the un-stamped document (the viewer
+   on "system" with a light OS) has a full palette. The two blocks below
+   redefine tokens only. */
+:root{
+  --ground:#F5F6F2; --stage:#EAEDE6; --panel:#FFFFFFEE; --panel-solid:#FFFFFF;
+  --ink:#14181A; --ink-2:#4A544E; --muted:#6C766F; --line:#D8DED4; --line-2:#E9ECE5;
+
+  /* Categorical segment hues, in assignment order. Searched rather than picked:
+     eight hues at OKLCH L 0.58, chroma capped at 0.145, ordered so the weakest
+     ADJACENT pair is as strong as possible -- adjacency is literal here, since
+     these colour stretches of chain that touch. Validated against
+     dataviz/scripts/validate_palette.js on this surface: lightness band, chroma
+     floor, CVD separation, normal-vision floor and contrast all pass. */
+  --cat-0:#089067; --cat-1:#925FBB; --cat-2:#BE5927; --cat-3:#0689A1;
+  --cat-4:#BF5063; --cat-5:#0481C7; --cat-6:#508D2C; --cat-7:#AD559A;
+  --cat-8:#8A938C;                       /* neutral: residues no segment claims */
+
+  --ramp-0:#DCEDE4; --ramp-1:#9CCEB4; --ramp-2:#4FA97F; --ramp-3:#177C57; --ramp-4:#0A4E37;
+  --conf-vh:#0053D6; --conf-h:#3FA9DE; --conf-l:#F26A2C; --conf-vl:#EFC400;
+  --shadow:0 1px 2px rgba(20,24,26,.06), 0 8px 24px rgba(20,24,26,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1211; --stage:#080B0A; --panel:#151A18F2; --panel-solid:#151A18;
+    --ink:#E6EBE7; --ink-2:#B3BEB7; --muted:#8B968F; --line:#242C29; --line-2:#1B2220;
+    --cat-0:#019E70; --cat-1:#9E6BC8; --cat-2:#C36D05; --cat-3:#0497A7;
+    --cat-4:#CE5D61; --cat-5:#1C8DD6; --cat-6:#649730; --cat-7:#C05F9B;
+    --cat-8:#7C867F;
+    --ramp-0:#2C5B49; --ramp-1:#33805F; --ramp-2:#3BA478; --ramp-3:#5FC79A; --ramp-4:#9AE6C4;
+    --conf-vh:#2E72E8; --conf-h:#65CBF3; --conf-l:#FF7D45; --conf-vl:#FFDB13;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1211; --stage:#080B0A; --panel:#151A18F2; --panel-solid:#151A18;
+  --ink:#E6EBE7; --ink-2:#B3BEB7; --muted:#8B968F; --line:#242C29; --line-2:#1B2220;
+  --cat-0:#019E70; --cat-1:#9E6BC8; --cat-2:#C36D05; --cat-3:#0497A7;
+  --cat-4:#CE5D61; --cat-5:#1C8DD6; --cat-6:#649730; --cat-7:#C05F9B;
+  --cat-8:#7C867F;
+  --ramp-0:#2C5B49; --ramp-1:#33805F; --ramp-2:#3BA478; --ramp-3:#5FC79A; --ramp-4:#9AE6C4;
+  --conf-vh:#2E72E8; --conf-h:#65CBF3; --conf-l:#FF7D45; --conf-vl:#FFDB13;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  height:100vh; overflow:hidden;
+}
+#stage{position:fixed; inset:0; background:var(--stage)}
+canvas{display:block; touch-action:none}
+
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+[hidden]{display:none !important}
+
+/* ---------- masthead ---------- */
+#head{
+  position:fixed; top:0; left:0; padding:22px 26px; max-width:min(46ch,60vw);
+  pointer-events:none; z-index:3;
+}
+#head h1{
+  font-family:Newsreader,Georgia,serif; font-weight:500; font-size:31px; line-height:1.1;
+  margin:0 0 7px; letter-spacing:-.012em; text-wrap:balance;
+}
+#head p{margin:0; font-size:12.5px; line-height:1.55; color:var(--ink-2); max-width:40ch}
+#head .eyebrow{
+  font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted);
+  margin:0 0 9px; font-weight:600;
+}
+
+/* ---------- control rail ---------- */
+#rail{
+  position:fixed; top:18px; right:18px; width:262px; z-index:4;
+  background:var(--panel); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow);
+  padding:14px 15px 15px; max-height:calc(100vh - 36px); overflow-y:auto;
+}
+.grp{display:flex; flex-direction:column; gap:7px}
+/* :not([hidden]) on both sides: groups remove themselves when the ensemble
+   cannot support them, and a plain `.grp + .grp` would leave the divider that
+   belonged to a group nobody can see stranded above the first visible one. */
+.grp:not([hidden]) + .grp:not([hidden]){
+  margin-top:15px; padding-top:15px; border-top:1px solid var(--line-2);
+}
+.lab{
+  display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600;
+}
+.lab .val{font-size:11.5px; letter-spacing:0; text-transform:none; color:var(--ink); font-weight:500}
+
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:18px; background:transparent; cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{height:3px; background:var(--line); border-radius:2px}
+input[type=range]::-moz-range-track{height:3px; background:var(--line); border-radius:2px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+  background:var(--cat-0); border:2px solid var(--panel-solid); margin-top:-5px;
+  box-shadow:0 0 0 1px var(--line);
+}
+input[type=range]::-moz-range-thumb{
+  width:13px; height:13px; border-radius:50%; background:var(--cat-0);
+  border:2px solid var(--panel-solid); box-shadow:0 0 0 1px var(--line);
+}
+input[type=range]:focus-visible{outline:2px solid var(--cat-0); outline-offset:3px; border-radius:4px}
+
+.seg{display:grid; gap:3px; grid-auto-flow:column; grid-auto-columns:1fr;
+     background:var(--line-2); padding:2.5px; border-radius:7px}
+.seg.wrap{grid-auto-flow:row; grid-template-columns:1fr 1fr}
+.seg button{
+  font:inherit; font-size:11px; font-weight:500; padding:5px 2px; border:0; cursor:pointer;
+  background:transparent; color:var(--ink-2); border-radius:5px; transition:background .12s,color .12s;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed=true]{background:var(--panel-solid); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.seg button:focus-visible{outline:2px solid var(--cat-0); outline-offset:1px}
+
+.row{display:flex; gap:7px}
+.row button{
+  flex:1; font:inherit; font-size:11px; font-weight:500; padding:6px 8px; cursor:pointer;
+  background:var(--panel-solid); color:var(--ink-2);
+  border:1px solid var(--line); border-radius:7px; transition:color .12s,border-color .12s;
+}
+.row button:hover{color:var(--ink); border-color:var(--muted)}
+.row button[aria-pressed=true]{color:var(--ink); border-color:var(--cat-0)}
+.row button:focus-visible{outline:2px solid var(--cat-0); outline-offset:1px}
+
+/* ---------- legend + readout ---------- */
+#legend{
+  position:fixed; left:26px; bottom:134px; z-index:3;
+  display:flex; flex-direction:column; gap:6px; font-size:11.5px;
+  max-height:38vh; overflow-y:auto; padding-right:6px;
+}
+#legend .item{display:flex; align-items:center; gap:8px; color:var(--ink-2)}
+#legend .sw{width:16px; height:3px; border-radius:2px; flex:none}
+#legend .sw.dot{width:7px; height:7px; border-radius:50%; margin:0 4.5px}
+#legend .rng{color:var(--muted); font-size:10.5px}
+
+#stats{
+  position:fixed; left:26px; bottom:236px; z-index:3; text-align:left;
+  display:flex; flex-direction:column; gap:5px;
+}
+#stats .s{font-size:11px; color:var(--muted)}
+#stats .s b{display:block; font-weight:500; font-size:15px; color:var(--ink); letter-spacing:-.01em}
+
+/* ---------- profile strip ---------- */
+#strip{
+  position:fixed; left:0; right:0; bottom:0; height:118px; z-index:3;
+  background:linear-gradient(to top, var(--ground) 62%, transparent);
+  padding:8px 26px 12px; display:flex; flex-direction:column; gap:3px;
+}
+#strip .cap{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600;
+}
+#strip .cap .read{letter-spacing:0; text-transform:none; font-size:11.5px; color:var(--ink)}
+#chart{flex:1; width:100%; display:block; cursor:crosshair}
+
+@media (max-width:900px){
+  #head{max-width:none; padding:16px 18px; position:static; padding-bottom:0}
+  #head h1{font-size:25px}
+  #rail{position:static; width:auto; margin:14px 18px; max-height:none}
+  #stage{position:fixed; inset:0}
+  #legend,#stats{display:none}
+  body{overflow-y:auto; height:auto}
+  #strip{position:static; background:none; height:120px}
+}
+</style>
+
+<div id="stage"><canvas id="gl"></canvas></div>
+
+<header id="head">
+  <p class="eyebrow" id="eyebrow"></p>
+  <h1 id="headline"></h1>
+  <p id="blurb"></p>
+</header>
+
+<div id="rail">
+  <div class="grp" id="grpCount">
+    <div class="lab"><span>Conformations drawn</span><span class="val mono" id="nOut">1</span></div>
+    <input type="range" id="nConf" min="1" max="1" value="1" step="1" aria-label="Conformations drawn">
+  </div>
+
+  <div class="grp" id="grpFit">
+    <div class="lab"><span>Superposed on</span></div>
+    <div class="seg wrap" id="fitSeg" role="group" aria-label="Superposition target"></div>
+  </div>
+
+  <div class="grp">
+    <div class="lab"><span>Coloured by</span></div>
+    <div class="seg" id="colSeg" role="group" aria-label="Colour mode"></div>
+  </div>
+
+  <div class="grp" id="grpPlay">
+    <div class="lab"><span>Model</span><span class="val mono" id="hOut">none</span></div>
+    <input type="range" id="hConf" min="0" max="1" value="1" step="1" aria-label="Highlighted model">
+    <div class="row">
+      <button id="playBtn" aria-pressed="true">Pause</button>
+      <button id="soloBtn" aria-pressed="true">Solo</button>
+    </div>
+    <div class="lab" style="margin-top:4px"><span>Models per second</span><span class="val mono" id="rOut">4</span></div>
+    <input type="range" id="rate" min="1" max="60" value="4" step="1" aria-label="Models per second">
+  </div>
+
+  <div class="grp" id="grpDensity">
+    <div class="lab"><span>Cloud density</span><span class="val mono" id="oOut">0.16</span></div>
+    <input type="range" id="opac" min="1" max="60" value="8" step="1" aria-label="Cloud density">
+  </div>
+
+  <div class="grp">
+    <div class="lab"><span>Rotation</span><span class="val mono" id="spOut">still</span></div>
+    <input type="range" id="spinRate" min="0" max="60" value="0" step="1" aria-label="Rotation speed">
+    <div class="row"><button id="reset">Reset view</button></div>
+  </div>
+</div>
+
+<div id="legend"></div>
+<div id="stats"></div>
+
+<div id="strip">
+  <div class="cap"><span id="stripTitle"></span><span class="read mono" id="stripRead">&nbsp;</span></div>
+  <svg id="chart" role="img" aria-label="Per-residue profile along the chain"></svg>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script id="payload" type="application/json">/*__PAYLOAD__*/</script>
+<script>
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("payload").textContent);
+  var META = DATA.meta, N = META.n, NRES = META.nres;
+  var SEGS = META.segments, FITS = META.fits;
+
+  /* ---------- decode ------------------------------------------------------
+     Coordinates ship once, as int16 in the anchor segment's frame; the other
+     superpositions ride as one rigid transform per conformer. One superposed
+     copy per fit target would be N times the bytes for the same information. */
+  function b64(str) {
+    var bin = atob(str), buf = new ArrayBuffer(bin.length), v = new Uint8Array(buf);
+    for (var i = 0; i < bin.length; i++) v[i] = bin.charCodeAt(i);
+    return buf;
+  }
+  var BASE = new Int16Array(b64(DATA.coords));
+  var XF = {};
+  Object.keys(DATA.transforms).forEach(function (k) {
+    XF[k] = new Float32Array(b64(DATA.transforms[k]));
+  });
+  var INV = 1 / META.scale;
+
+  /* ---------- what this particular ensemble supports ---------------------- */
+  var CONF = META.confidence;                       // null when the source had none
+  var RMSF = META.rmsf;
+  var SS = META.ss;                                 // null when Ca only
+  var RMSF_LO = Math.min.apply(null, RMSF), RMSF_HI = Math.max.apply(null, RMSF);
+  var HAS_MOBILITY = RMSF_HI - RMSF_LO > 1e-6;      // false for a single conformer
+  var IS_PLDDT = CONF && META.confidence_label === "pLDDT";
+  var RESNUM = META.resnum;                         // author numbering, or null
+
+  function resLabel(r) { return RESNUM ? RESNUM[r] : r + 1; }
+
+  /* ---------- masthead and the mode buttons ------------------------------- */
+  document.title = META.title;
+  document.getElementById("headline").textContent = META.title;
+  var eyebrow = document.getElementById("eyebrow");
+  eyebrow.textContent = META.eyebrow || "";
+  eyebrow.hidden = !META.eyebrow;
+  var blurb = document.getElementById("blurb");
+  blurb.textContent = META.blurb || "";
+  blurb.hidden = !META.blurb;
+
+  /* Order is the default: whichever mode is listed first is the one the page
+     opens on. Confidence wins when the source carried it -- it is the only mode
+     that says something about the prediction rather than about the geometry. */
+  var MODES = [];
+  if (CONF) MODES.push(["confidence", IS_PLDDT ? "Confidence" : META.confidence_label]);
+  if (SEGS.length > 1) MODES.push(["segment", "Segment"]);
+  if (HAS_MOBILITY) MODES.push(["mobility", "Mobility"]);
+  if (!MODES.length) MODES.push(["segment", "Chain"]);
+
+  document.getElementById("colSeg").innerHTML = MODES.map(function (m, i) {
+    return '<button data-col="' + m[0] + '" aria-pressed="' + (i === 0) + '">' + m[1] + "</button>";
+  }).join("");
+
+  /* One button per fit target. "Whole chain" is always offered; the rest are
+     the segments, which for a single-body chain is only itself -- so the group
+     hides rather than showing one button that does nothing. */
+  document.getElementById("fitSeg").innerHTML = FITS.map(function (f, i) {
+    var label = f === "all" ? "Whole chain" : f;
+    return '<button data-fit="' + f.replace(/"/g, "&quot;") + '" aria-pressed="' +
+      (i === 0) + '">' + label + "</button>";
+  }).join("");
+  document.getElementById("grpFit").hidden = FITS.length < 2;
+
+  document.getElementById("stats").innerHTML = META.stats.map(function (s) {
+    return '<div class="s"><b class="mono">' + s.value + "</b>" + s.label + "</div>";
+  }).join("");
+
+  /* ---------- palette read back out of the stylesheet ---------------------
+     The tokens are the single source of truth for colour, so the geometry asks
+     the document what they currently resolve to rather than repeating hexes
+     here where a theme change could not reach them. */
+  var CSS = getComputedStyle(document.documentElement);
+  function tok(name) { return new THREE.Color(CSS.getPropertyValue(name).trim()); }
+  var PAL = {};
+  function readPalette() {
+    CSS = getComputedStyle(document.documentElement);
+    PAL.cat = [];
+    for (var i = 0; i <= 8; i++) PAL.cat.push(tok("--cat-" + i));
+    PAL.ramp = ["--ramp-0", "--ramp-1", "--ramp-2", "--ramp-3", "--ramp-4"].map(tok);
+    PAL.conf = ["--conf-vh", "--conf-h", "--conf-l", "--conf-vl"].map(tok);
+    PAL.stage = tok("--stage");
+    PAL.ink = tok("--ink");
+  }
+  readPalette();
+
+  function rampAt(t) {
+    t = Math.max(0, Math.min(1, t));
+    var x = t * (PAL.ramp.length - 1), i = Math.min(PAL.ramp.length - 2, Math.floor(x));
+    return PAL.ramp[i].clone().lerp(PAL.ramp[i + 1], x - i);
+  }
+
+  /* Hue index per residue, resolved once, so colouring never re-walks ranges. */
+  var hueOf = new Uint8Array(NRES);
+  SEGS.forEach(function (s) {
+    s.ranges.forEach(function (r) {
+      for (var i = r[0] - 1; i < r[1]; i++) hueOf[i] = s.hue;
+    });
+  });
+
+  var CONF_BANDS = [
+    [90, "Very high", "pLDDT &gt; 90"],
+    [70, "Confident", "90 &gt; pLDDT &gt; 70"],
+    [50, "Low", "70 &gt; pLDDT &gt; 50"],
+    [-Infinity, "Very low", "pLDDT &lt; 50"]
+  ];
+  function confBand(v) {
+    for (var i = 0; i < CONF_BANDS.length; i++) if (v > CONF_BANDS[i][0]) return i;
+    return CONF_BANDS.length - 1;
+  }
+  var CONF_LO = CONF ? Math.min.apply(null, CONF) : 0;
+  var CONF_HI = CONF ? Math.max.apply(null, CONF) : 100;
+
+  /* ---------- three.js scaffolding ---------------------------------------- */
+  var canvas = document.getElementById("gl");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  /* A linear workflow is most of what separates a "3D shape" from something
+     that reads as photographed: colours go into the buffers linearised and come
+     back out encoded. No tone mapping -- ACES rolls off highlights gracefully
+     and pays for it in desaturation, which on a banded scale reads as the
+     palette going pale. */
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(38, 1, 1, 4000);
+  var root = new THREE.Group();
+  scene.add(root);
+  /* Three-point rig plus a hemisphere fill. A single directional light against
+     flat ambient renders a tube as a flat ribbon; the rim light from behind is
+     what separates the strand from the ground and reads as depth. */
+  scene.add(new THREE.HemisphereLight(0xbcd2e8, 0x22303a, 0.38));
+  var key = new THREE.DirectionalLight(0xffffff, 1.05);
+  key.position.set(1.1, 1.4, 1.7);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.bias = -0.0016;
+  key.shadow.normalBias = 0.35;
+  scene.add(key);
+  var fill = new THREE.DirectionalLight(0xdfe9f5, 0.26);
+  fill.position.set(-1.5, -0.4, 0.9);
+  scene.add(fill);
+  var rim = new THREE.DirectionalLight(0xffffff, 0.40);
+  rim.position.set(-0.6, 0.8, -1.8);
+  scene.add(rim);
+
+  /* Image-based lighting, generated rather than fetched: a sky-to-ground
+     gradient through PMREM gives soft directional falloff across a curved
+     surface, which is what makes a tube look like a solid object instead of a
+     painted ribbon. No external asset, so nothing to load or block. */
+  (function () {
+    var c = document.createElement("canvas");
+    c.width = 16; c.height = 128;
+    var g = c.getContext("2d");
+    var grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0.00, "#dfeaf6");
+    grad.addColorStop(0.42, "#7d8b98");
+    grad.addColorStop(0.55, "#3a444c");
+    grad.addColorStop(1.00, "#0c1013");
+    g.fillStyle = grad; g.fillRect(0, 0, 16, 128);
+    var tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    var pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    scene.environment = pmrem.fromEquirectangular(tex).texture;
+    pmrem.dispose();
+    tex.dispose();
+  })();
+
+  var cloudGeo = new THREE.BufferGeometry();
+  var cloudMat = new THREE.LineBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.08, depthWrite: false
+  });
+  var cloud = new THREE.LineSegments(cloudGeo, cloudMat);
+  root.add(cloud);
+
+  var tube = null;                                  // the highlighted model
+  var marker = new THREE.Mesh(
+    new THREE.SphereGeometry(1.5, 20, 14),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  marker.visible = false;
+  root.add(marker);
+
+  /* ---------- state -------------------------------------------------------- */
+  var state = { n: N, fit: FITS[0], col: MODES[0][0], hi: 1, opacity: 0.08,
+                spinRate: 0, res: -1, playing: N > 1, rate: 4, solo: true, acc: 0 };
+
+  var pt = new Float32Array(NRES * 3);
+  function conformer(k) {
+    var M = XF[state.fit], o = k * 12, b = k * NRES * 3;
+    var r0 = M[o], r1 = M[o + 1], r2 = M[o + 2],
+        r3 = M[o + 3], r4 = M[o + 4], r5 = M[o + 5],
+        r6 = M[o + 6], r7 = M[o + 7], r8 = M[o + 8],
+        tx = M[o + 9], ty = M[o + 10], tz = M[o + 11];
+    for (var r = 0; r < NRES; r++) {
+      var i = b + r * 3;
+      var x = BASE[i] * INV, y = BASE[i + 1] * INV, z = BASE[i + 2] * INV;
+      pt[r * 3]     = r0 * x + r1 * y + r2 * z + tx;
+      pt[r * 3 + 1] = r3 * x + r4 * y + r5 * z + ty;
+      pt[r * 3 + 2] = r6 * x + r7 * y + r8 * z + tz;
+    }
+    return pt;
+  }
+
+  function residueColor(r, out) {
+    if (state.col === "confidence" && CONF) return out.copy(PAL.conf[confBand(CONF[r])]);
+    if (state.col === "mobility" && HAS_MOBILITY)
+      return out.copy(rampAt((RMSF[r] - RMSF_LO) / (RMSF_HI - RMSF_LO)));
+    return out.copy(PAL.cat[hueOf[r]]);
+  }
+
+  /* PAL holds sRGB, because the legend and the chart are DOM and want hex. The
+     renderer is linear, so anything written into a buffer is converted on the
+     way in -- otherwise every colour renders washed out. */
+  function lin(c) { return c.convertSRGBToLinear(); }
+  var tmp = new THREE.Color(), tmp2 = new THREE.Color();
+
+  function setCount() {
+    /* Solo draws no cloud at all: the point of stepping through the models is
+       to see one conformation, not one conformation on top of a smear. */
+    cloudGeo.setDrawRange(0, state.solo ? 0 : state.n * (NRES - 1) * 2);
+  }
+
+  function rebuild() {
+    var segs = NRES - 1, verts = N * segs * 2;
+    var pos = new Float32Array(verts * 3), col = new Float32Array(verts * 3);
+    var w = 0;
+    for (var k = 0; k < N; k++) {
+      var p = conformer(k);
+      for (var r = 0; r < segs; r++) {
+        lin(residueColor(r, tmp)); lin(residueColor(r + 1, tmp2));
+        pos[w * 3] = p[r * 3]; pos[w * 3 + 1] = p[r * 3 + 1]; pos[w * 3 + 2] = p[r * 3 + 2];
+        col[w * 3] = tmp.r; col[w * 3 + 1] = tmp.g; col[w * 3 + 2] = tmp.b; w++;
+        pos[w * 3] = p[(r + 1) * 3]; pos[w * 3 + 1] = p[(r + 1) * 3 + 1]; pos[w * 3 + 2] = p[(r + 1) * 3 + 2];
+        col[w * 3] = tmp2.r; col[w * 3 + 1] = tmp2.g; col[w * 3 + 2] = tmp2.b; w++;
+      }
+    }
+    cloudGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    cloudGeo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    cloudGeo.computeBoundingSphere();
+    setCount();
+    buildTube();
+    placeMarker();
+  }
+
+  /* One job per frame at most: sliders fire `input` far faster than a geometry
+     rebuild can finish, and without this a drag queues dozens of them. */
+  var queued = {};
+  function schedule(k, fn) {
+    if (queued[k]) return;
+    queued[k] = true;
+    requestAnimationFrame(function () { queued[k] = false; fn(); });
+  }
+
+  /* ---------- cartoon ribbon ------------------------------------------------
+     A tube says nothing about the fold. Where the source carried a full
+     backbone, secondary structure was assigned by hydrogen bonding and voted
+     across the ensemble, and this builds the standard cartoon from it: helices
+     and strands as flat ribbons, strands ending in an arrowhead, everything
+     else as thin cord. Where it did not, SS is null and every residue takes the
+     coil profile -- a plain tube, which claims nothing that was not measured.
+
+     Two details matter for it to read correctly. Strand guide points are
+     smoothed, because raw Ca positions in a beta strand zig-zag by ~1 A and an
+     unsmoothed ribbon pleats. And the ribbon normal is carried along the chain
+     with sign continuity, because the peptide-plane normal flips freely between
+     residues and a flipped normal shows up as a 180-degree twist. */
+
+  var RIB = { seg: 10, sides: 12, strandW: 1.20, strandT: 0.28,
+              helixW: 1.05, helixT: 0.34, headW: 2.15, headLen: 1.7, coil: 0.36 };
+
+  function ssAt(r) { return SS ? SS.charAt(r) : "C"; }
+
+  /* Strand extents, so an arrowhead knows where its point belongs. */
+  var STRAND = (function () {
+    var out = new Array(NRES), i = 0;
+    if (!SS) return out;
+    while (i < NRES) {
+      var j = i;
+      while (j + 1 < NRES && SS.charAt(j + 1) === SS.charAt(i)) j++;
+      if (SS.charAt(i) === "E") for (var k = i; k <= j; k++) out[k] = { a: i, b: j };
+      i = j + 1;
+    }
+    return out;
+  })();
+
+  function chainFrames(p) {
+    var g = [], n = [];
+    var a = new THREE.Vector3(), b = new THREE.Vector3(), v = new THREE.Vector3();
+    for (var r = 0; r < NRES; r++) {
+      var i0 = Math.max(0, r - 1), i1 = Math.min(NRES - 1, r + 1);
+      var w = ssAt(r) === "E" ? 0.25 : 0.0;     // smooth only where the pleat lives
+      g.push(new THREE.Vector3(
+        p[r * 3] * (1 - 2 * w) + p[i0 * 3] * w + p[i1 * 3] * w,
+        p[r * 3 + 1] * (1 - 2 * w) + p[i0 * 3 + 1] * w + p[i1 * 3 + 1] * w,
+        p[r * 3 + 2] * (1 - 2 * w) + p[i0 * 3 + 2] * w + p[i1 * 3 + 2] * w));
+      a.set(p[i1 * 3] - p[r * 3], p[i1 * 3 + 1] - p[r * 3 + 1], p[i1 * 3 + 2] - p[r * 3 + 2]);
+      b.set(p[i0 * 3] - p[r * 3], p[i0 * 3 + 1] - p[r * 3 + 1], p[i0 * 3 + 2] - p[r * 3 + 2]);
+      v.crossVectors(a, b);
+      if (v.lengthSq() < 1e-9) v.set(0, 0, 1);
+      n.push(v.clone().normalize());
+    }
+    for (var k = 1; k < NRES; k++) if (n[k].dot(n[k - 1]) < 0) n[k].negate();
+    return { g: g, n: n };
+  }
+
+  function profile(f, out) {
+    var r = Math.max(0, Math.min(NRES - 1, Math.round(f))), s = ssAt(r);
+    if (s === "E") {
+      var seg = STRAND[r], fromEnd = (seg.b + 0.5) - f;
+      if (fromEnd <= RIB.headLen) {
+        var u = Math.max(0, fromEnd / RIB.headLen);
+        out.w = 0.06 + (RIB.headW - 0.06) * u;
+        out.t = RIB.strandT;
+        return out;
+      }
+      out.w = RIB.strandW; out.t = RIB.strandT; return out;
+    }
+    if (s === "H") { out.w = RIB.helixW; out.t = RIB.helixT; return out; }
+    out.w = RIB.coil; out.t = RIB.coil; return out;
+  }
+
+  function buildTube() {
+    if (tube) { root.remove(tube); tube.geometry.dispose(); tube.material.dispose(); tube = null; }
+    if (!state.hi) return;
+
+    var p = conformer(state.hi - 1);
+    var fr = chainFrames(p);
+    var curve = new THREE.CatmullRomCurve3(fr.g, false, "centripetal", 0.5);
+    var S = (NRES - 1) * RIB.seg, sides = RIB.sides;
+
+    // Per-sample profile, then a light smoothing pass so the coil-to-strand
+    // boundary widens over half a residue instead of stepping.
+    var W = new Float32Array(S + 1), T = new Float32Array(S + 1), tmpP = { w: 0, t: 0 };
+    var i, k;
+    for (i = 0; i <= S; i++) {
+      profile(i / RIB.seg, tmpP);
+      W[i] = tmpP.w; T[i] = tmpP.t;
+    }
+    var Ws = W.slice(), Ts = T.slice(), K = Math.round(RIB.seg * 0.45);
+    for (i = 0; i <= S; i++) {
+      var sw = 0, st = 0, c = 0;
+      for (var d = -K; d <= K; d++) {
+        var j = i + d; if (j < 0 || j > S) continue;
+        sw += W[j]; st += T[j]; c++;
+      }
+      Ws[i] = sw / c; Ts[i] = st / c;
+    }
+
+    var pos = new Float32Array((S + 1) * sides * 3);
+    var nor = new Float32Array((S + 1) * sides * 3);
+    var col = new Float32Array((S + 1) * sides * 3);
+    var P = new THREE.Vector3(), Tg = new THREE.Vector3();
+    var Nv = new THREE.Vector3(), Bv = new THREE.Vector3(), tmpN = new THREE.Vector3();
+
+    for (i = 0; i <= S; i++) {
+      var f = i / RIB.seg, u = i / S;
+      curve.getPointAt(Math.min(1, u), P);
+      curve.getTangentAt(Math.min(1, u), Tg).normalize();
+
+      var i0 = Math.min(NRES - 2, Math.floor(f)), fr2 = f - i0;
+      Nv.copy(fr.n[i0]).lerp(fr.n[i0 + 1], fr2);
+      Nv.addScaledVector(Tg, -Nv.dot(Tg));            // orthogonalise
+      if (Nv.lengthSq() < 1e-9) Nv.set(0, 1, 0).addScaledVector(Tg, -Tg.y);
+      Nv.normalize();
+      Bv.crossVectors(Tg, Nv).normalize();
+
+      lin(residueColor(Math.max(0, Math.min(NRES - 1, Math.round(f))), tmp));
+      var hw = Ws[i], ht = Ts[i];
+
+      for (k = 0; k < sides; k++) {
+        var ang = (k / sides) * Math.PI * 2, ca = Math.cos(ang), sa = Math.sin(ang);
+        var o = (i * sides + k) * 3;
+        pos[o]     = P.x + Bv.x * hw * ca + Nv.x * ht * sa;
+        pos[o + 1] = P.y + Bv.y * hw * ca + Nv.y * ht * sa;
+        pos[o + 2] = P.z + Bv.z * hw * ca + Nv.z * ht * sa;
+        // Ellipse normal: gradient of (x/w)^2 + (y/t)^2.
+        tmpN.set(0, 0, 0)
+          .addScaledVector(Bv, ca / Math.max(1e-3, hw))
+          .addScaledVector(Nv, sa / Math.max(1e-3, ht)).normalize();
+        nor[o] = tmpN.x; nor[o + 1] = tmpN.y; nor[o + 2] = tmpN.z;
+        col[o] = tmp.r; col[o + 1] = tmp.g; col[o + 2] = tmp.b;
+      }
+    }
+
+    var idx = [];
+    for (i = 0; i < S; i++) {
+      for (k = 0; k < sides; k++) {
+        var k2 = (k + 1) % sides;
+        var a0 = i * sides + k, b0 = i * sides + k2;
+        var a1 = (i + 1) * sides + k, b1 = (i + 1) * sides + k2;
+        idx.push(a0, a1, b1, a0, b1, b0);
+      }
+    }
+
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.setIndex(idx);
+
+    tube = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.42, metalness: 0.0,
+      envMapIntensity: 0.85, side: THREE.DoubleSide
+    }));
+    tube.castShadow = true;
+    tube.receiveShadow = true;
+    root.add(tube);
+  }
+
+  function placeMarker() {
+    if (state.res < 0) { marker.visible = false; return; }
+    var k = state.hi ? state.hi - 1 : 0, p = conformer(k);
+    marker.position.set(p[state.res * 3], p[state.res * 3 + 1], p[state.res * 3 + 2]);
+    marker.material.color.copy(lin(residueColor(state.res, tmp)));
+    marker.visible = true;
+  }
+
+  /* ---------- camera: hand-rolled orbit, so no second CDN file ------------- */
+  var cam = { theta: 0.6, phi: 1.15, dist: 190, target: new THREE.Vector3() };
+  function applyCamera() {
+    var s = Math.sin(cam.phi), x = cam.dist * s * Math.cos(cam.theta),
+        y = cam.dist * Math.cos(cam.phi), z = cam.dist * s * Math.sin(cam.theta);
+    camera.position.set(cam.target.x + x, cam.target.y + y, cam.target.z + z);
+    camera.lookAt(cam.target);
+  }
+
+  /* Frame whatever is drawn. The anchor sits at the origin by construction but
+     the cloud fans out on one side of it, so aiming at the origin pushes the
+     ensemble into a corner. Aim at the geometry's own centre instead. */
+  function autoFrame() {
+    var sph = cloudGeo.boundingSphere;
+    if (!sph) return;
+    cam.target.copy(sph.center);
+    var fov = camera.fov * Math.PI / 180;
+    cam.dist = (sph.radius / Math.sin(fov / 2)) * 0.92;
+
+    /* A directional light's shadow camera sits at the light and defaults to a
+       10-unit box; the ensemble spans far more than that, so it has to be sized
+       and pushed back or the structure never appears in its own shadow map. */
+    var R = Math.max(1, sph.radius);
+    key.position.set(1.1, 1.4, 1.7).normalize().multiplyScalar(R * 3).add(cam.target);
+    key.target.position.copy(cam.target);
+    if (!key.target.parent) scene.add(key.target);
+    var sc = key.shadow.camera;
+    sc.left = -R * 1.25; sc.right = R * 1.25;
+    sc.top = R * 1.25; sc.bottom = -R * 1.25;
+    sc.near = R * 0.4; sc.far = R * 6.5;
+    sc.updateProjectionMatrix();
+
+    applyCamera();
+  }
+  var bg = new THREE.Color();
+  var drag = null;
+  canvas.addEventListener("pointerdown", function (e) {
+    drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2 };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.pan) {
+      var right = new THREE.Vector3(), up = new THREE.Vector3();
+      camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
+      cam.target.addScaledVector(right, -dx * cam.dist * 0.0016);
+      cam.target.addScaledVector(up, dy * cam.dist * 0.0016);
+    } else {
+      cam.theta -= dx * 0.006;
+      cam.phi = Math.max(0.06, Math.min(Math.PI - 0.06, cam.phi - dy * 0.006));
+    }
+    applyCamera();
+  });
+  ["pointerup", "pointercancel"].forEach(function (t) {
+    canvas.addEventListener(t, function () { drag = null; });
+  });
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    cam.dist = Math.max(20, Math.min(3000, cam.dist * (1 + Math.sign(e.deltaY) * 0.09)));
+    applyCamera();
+  }, { passive: false });
+
+  function resize() {
+    /* updateStyle must stay on: with it off the canvas keeps its drawing-buffer
+       size (viewport x devicePixelRatio) as its CSS size, so on a 2x display the
+       element is twice the viewport and only its top-left quadrant is visible --
+       which reads as a scene stuck down and to the right. */
+    renderer.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  }
+  addEventListener("resize", function () { resize(); drawChart(); });
+
+  /* ---------- render loop -------------------------------------------------- */
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    state.spinRate = 0;
+    state.playing = false;
+  }
+  var last = 0;
+  function frame(now) {
+    var dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+    last = now;
+    if (state.spinRate && !drag) {
+      cam.theta += state.spinRate * Math.PI / 180 * dt;
+      applyCamera();
+    }
+    if (state.playing && N > 1) {
+      state.acc += dt * state.rate;
+      if (state.acc >= 1) {
+        var step = Math.floor(state.acc);
+        state.acc -= step;
+        /* wraps 1..N so every model is shown, none skipped at the loop point */
+        state.hi = ((state.hi - 1 + step) % N + N) % N + 1;
+        hConf.value = String(state.hi);
+        hOut.textContent = "#" + state.hi;
+        buildTube(); placeMarker();
+      }
+    }
+    scene.background = lin(bg.copy(PAL.stage));
+    /* Fog tied to the camera distance, so the far side of the structure recedes
+       instead of competing with the near side. */
+    if (!scene.fog) scene.fog = new THREE.Fog(0x000000, 1, 2);
+    scene.fog.color.copy(scene.background);
+    scene.fog.near = cam.dist * 0.55;
+    scene.fog.far = cam.dist * 2.15;
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- controls ----------------------------------------------------- */
+  var nConf = document.getElementById("nConf"), nOut = document.getElementById("nOut");
+  nConf.max = String(N);
+  nConf.value = String(N);
+  document.getElementById("grpCount").hidden = N < 2;
+  document.getElementById("grpDensity").hidden = N < 2;
+  document.getElementById("grpPlay").hidden = N < 2;
+  nConf.addEventListener("input", function () {
+    state.n = +nConf.value; nOut.textContent = state.n; setCount();
+  });
+
+  var hConf = document.getElementById("hConf"), hOut = document.getElementById("hOut");
+  hConf.max = String(N);
+  hConf.addEventListener("input", function () {
+    state.hi = +hConf.value;
+    state.playing = false;
+    playBtn.textContent = "Play all";
+    playBtn.setAttribute("aria-pressed", "false");
+    hOut.textContent = state.hi ? "#" + state.hi : "none";
+    schedule("tube", function () { buildTube(); placeMarker(); });
+  });
+
+  var opac = document.getElementById("opac"), oOut = document.getElementById("oOut");
+  opac.addEventListener("input", function () {
+    state.opacity = +opac.value / 100;
+    cloudMat.opacity = state.opacity;
+    oOut.textContent = state.opacity.toFixed(2);
+  });
+
+  function segGroup(id, key, after) {
+    var box = document.getElementById(id);
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      [].forEach.call(box.querySelectorAll("button"), function (x) {
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      state[key] = b.dataset[key];
+      after();
+    });
+  }
+  segGroup("fitSeg", "fit", function () { rebuild(); autoFrame(); });
+  segGroup("colSeg", "col", function () { rebuild(); drawLegend(); drawChart(); });
+
+  var playBtn = document.getElementById("playBtn"), soloBtn = document.getElementById("soloBtn");
+  var rate = document.getElementById("rate"), rOut = document.getElementById("rOut");
+  playBtn.addEventListener("click", function () {
+    state.playing = !state.playing;
+    if (state.playing && !state.hi) { state.hi = 1; hConf.value = "1"; hOut.textContent = "#1"; buildTube(); }
+    state.acc = 0;
+    playBtn.textContent = state.playing ? "Pause" : "Play all";
+    playBtn.setAttribute("aria-pressed", String(state.playing));
+  });
+  soloBtn.addEventListener("click", function () {
+    state.solo = !state.solo;
+    soloBtn.setAttribute("aria-pressed", String(state.solo));
+    setCount();
+  });
+  rate.addEventListener("input", function () {
+    state.rate = +rate.value; rOut.textContent = state.rate;
+  });
+
+  var spinRate = document.getElementById("spinRate"), spOut = document.getElementById("spOut");
+  spinRate.addEventListener("input", function () {
+    state.spinRate = +spinRate.value;
+    spOut.textContent = state.spinRate ? state.spinRate + "°/s" : "still";
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    cam.theta = 0.6; cam.phi = 1.15; autoFrame();
+  });
+
+  /* ---------- legend ------------------------------------------------------- */
+  var legend = document.getElementById("legend");
+  function swatch(color, label, note, dot) {
+    return '<div class="item"><span class="sw' + (dot ? " dot" : "") +
+      '" style="background:' + color + '"></span><span>' + label +
+      (note ? ' <span class="rng">' + note + "</span>" : "") + "</span></div>";
+  }
+  function hex(c) { return "#" + c.getHexString(); }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function rangeText(s) {
+    return s.ranges.map(function (r) { return r[0] + "–" + r[1]; }).join(", ");
+  }
+  function drawLegend() {
+    if (state.col === "confidence" && CONF) {
+      legend.innerHTML = IS_PLDDT
+        ? CONF_BANDS.map(function (band, i) {
+            return swatch(hex(PAL.conf[i]), band[1], band[2]);
+          }).join("")
+        : swatch(hex(PAL.conf[0]), META.confidence_label,
+                 CONF_LO.toFixed(1) + " → " + CONF_HI.toFixed(1));
+    } else if (state.col === "mobility") {
+      legend.innerHTML =
+        '<div class="item"><span class="sw" style="width:76px;height:7px;border-radius:3px;background:linear-gradient(90deg,' +
+        PAL.ramp.map(hex).join(",") + ')"></span><span>Mobility <span class="rng">' +
+        RMSF_LO.toFixed(1) + " &rarr; " + RMSF_HI.toFixed(1) + " &Aring;</span></span></div>";
+    } else {
+      legend.innerHTML = SEGS.map(function (s) {
+        return swatch(hex(PAL.cat[s.hue]), esc(s.name), rangeText(s),
+                      s.name === "Unassigned");
+      }).join("");
+    }
+  }
+
+  /* ---------- profile strip ------------------------------------------------ */
+  var chart = document.getElementById("chart");
+  var stripTitle = document.getElementById("stripTitle");
+  var stripRead = document.getElementById("stripRead");
+
+  function series() {
+    if (state.col === "mobility" || !CONF)
+      return { v: RMSF, lo: 0, hi: Math.max(RMSF_HI, 1e-6),
+               name: "Per-residue mobility", unit: " Å", dp: 1, banded: false };
+    return { v: CONF, lo: Math.floor(Math.min(CONF_LO, 50) / 10) * 10,
+             hi: IS_PLDDT ? 100 : CONF_HI,
+             name: "Per-residue " + (IS_PLDDT ? "confidence" : META.confidence_label),
+             unit: IS_PLDDT ? " lDDT" : "", dp: 1, banded: !!IS_PLDDT };
+  }
+
+  /* Tick positions: first, last, and evenly spaced inside, snapped to residues
+     so the labels always name a residue that exists. */
+  function ticks() {
+    var out = [0], want = Math.min(5, NRES);
+    for (var i = 1; i < want - 1; i++) out.push(Math.round(i * (NRES - 1) / (want - 1)));
+    if (NRES > 1) out.push(NRES - 1);
+    return out;
+  }
+
+  function drawChart() {
+    var s = series(), box = chart.getBoundingClientRect();
+    var w = Math.max(320, box.width), h = Math.max(40, box.height);
+    var padL = 34, padR = 10, padT = 7, padB = 17;
+    var iw = w - padL - padR, ih = h - padT - padB;
+    stripTitle.textContent = s.name;
+    var span = Math.max(1e-9, s.hi - s.lo);
+    var X = function (r) { return padL + (NRES > 1 ? (r / (NRES - 1)) * iw : iw / 2); };
+    var Y = function (v) { return padT + ih - ((v - s.lo) / span) * ih; };
+
+    var out = [], r;
+    /* segment bands first, so the line reads on top of them */
+    if (SEGS.length > 1) {
+      SEGS.forEach(function (sg) {
+        sg.ranges.forEach(function (rg) {
+          var x0 = X(rg[0] - 1), x1 = X(rg[1] - 1);
+          out.push('<rect x="' + x0 + '" y="' + padT + '" width="' + Math.max(1, x1 - x0) +
+            '" height="' + ih + '" fill="' + hex(PAL.cat[sg.hue]) + '" opacity="0.09"/>');
+        });
+      });
+    }
+    var ink = hex(PAL.ink);
+    [s.lo, (s.lo + s.hi) / 2, s.hi].forEach(function (v) {
+      out.push('<line x1="' + padL + '" x2="' + (w - padR) + '" y1="' + Y(v) + '" y2="' + Y(v) +
+        '" stroke="' + ink + '" opacity="0.10" stroke-width="1"/>');
+      out.push('<text x="' + (padL - 5) + '" y="' + (Y(v) + 3.2) + '" text-anchor="end" fill="' + ink +
+        '" opacity="0.5" font-size="9" font-family="IBM Plex Mono, monospace">' +
+        (Math.abs(v) < 10 ? v.toFixed(1) : v.toFixed(0)) + "</text>");
+    });
+
+    if (s.banded) {
+      /* Draw the band thresholds, then the trace in runs coloured by band, so
+         the profile and the 3D view read off exactly the same cut points. */
+      [90, 70, 50].forEach(function (v) {
+        if (v <= s.lo || v >= s.hi) return;
+        out.push('<line x1="' + padL + '" x2="' + (w - padR) + '" y1="' + Y(v) + '" y2="' + Y(v) +
+          '" stroke="' + ink + '" opacity="0.20" stroke-width="1" stroke-dasharray="3 3"/>');
+      });
+      var start = 0;
+      for (r = 1; r <= NRES; r++) {
+        if (r === NRES || confBand(s.v[r]) !== confBand(s.v[start])) {
+          var run = "";
+          for (var k = start; k < Math.min(r + 1, NRES); k++)
+            run += (k === start ? "M" : "L") + X(k).toFixed(1) + " " + Y(s.v[k]).toFixed(1);
+          out.push('<path d="' + run + '" fill="none" stroke="' +
+            hex(PAL.conf[confBand(s.v[start])]) +
+            '" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round"/>');
+          start = r;
+        }
+      }
+    } else {
+      var d = "";
+      for (r = 0; r < NRES; r++) d += (r ? "L" : "M") + X(r).toFixed(1) + " " + Y(s.v[r]).toFixed(1);
+      out.push('<path d="' + d + '" fill="none" stroke="' +
+        hex(state.col === "mobility" ? PAL.cat[2] : PAL.cat[0]) +
+        '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>');
+    }
+    if (state.res >= 0) {
+      out.push('<line x1="' + X(state.res) + '" x2="' + X(state.res) + '" y1="' + padT + '" y2="' + (padT + ih) +
+        '" stroke="' + ink + '" opacity="0.35" stroke-width="1"/>');
+      out.push('<circle cx="' + X(state.res) + '" cy="' + Y(s.v[state.res]) + '" r="3.4" fill="' + ink + '"/>');
+    }
+    ticks().forEach(function (r0) {
+      out.push('<text x="' + X(r0) + '" y="' + (h - 3) + '" text-anchor="middle" fill="' + ink +
+        '" opacity="0.5" font-size="9" font-family="IBM Plex Mono, monospace">' + resLabel(r0) + "</text>");
+    });
+    chart.setAttribute("viewBox", "0 0 " + w + " " + h);
+    chart.innerHTML = out.join("");
+  }
+
+  function bindChart() {
+    chart.addEventListener("pointermove", function (e) {
+      var b = chart.getBoundingClientRect(), padL = 34, padR = 10;
+      var iw = b.width - padL - padR;
+      var r = Math.round(((e.clientX - b.left - padL) / iw) * (NRES - 1));
+      r = Math.max(0, Math.min(NRES - 1, r));
+      if (r === state.res) return;
+      state.res = r;
+      var s = series();
+      stripRead.textContent = "residue " + resLabel(r) + " · " + s.v[r].toFixed(s.dp) + s.unit;
+      placeMarker(); drawChart();
+    });
+    chart.addEventListener("pointerleave", function () {
+      state.res = -1; stripRead.innerHTML = "&nbsp;"; placeMarker(); drawChart();
+    });
+  }
+
+  /* ---------- theme changes repaint the geometry --------------------------- */
+  function onTheme() { readPalette(); rebuild(); drawLegend(); drawChart(); }
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onTheme);
+  new MutationObserver(onTheme).observe(document.documentElement, {
+    attributes: true, attributeFilter: ["data-theme"]
+  });
+
+  /* ---------- go ----------------------------------------------------------- */
+  /* Browsers restore <input> values across a reload, so the sliders can come
+     back carrying the previous visit's settings while `state` still holds the
+     literals it was declared with. Read the inputs first and let them win: that
+     keeps the readouts, the sliders and the scene describing one thing. */
+  function syncFromInputs() {
+    state.n = Math.min(N, +nConf.value || N);
+    state.hi = Math.min(N, +hConf.value || 1);
+    state.opacity = +opac.value / 100;
+    state.rate = +rate.value;
+    state.spinRate = +spinRate.value;
+    nOut.textContent = state.n;
+    hOut.textContent = state.hi ? "#" + state.hi : "none";
+    oOut.textContent = state.opacity.toFixed(2);
+    rOut.textContent = state.rate;
+    spOut.textContent = state.spinRate ? state.spinRate + "°/s" : "still";
+    cloudMat.opacity = state.opacity;
+    playBtn.textContent = state.playing ? "Pause" : "Play all";
+    playBtn.setAttribute("aria-pressed", String(state.playing));
+  }
+
+  syncFromInputs();
+  resize(); rebuild(); autoFrame(); drawLegend(); drawChart(); bindChart();
+  requestAnimationFrame(frame);
+})();
+</script>
